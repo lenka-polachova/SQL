@@ -13,32 +13,49 @@ SELECT DISTINCT
 FROM covid19_basic cb
 ORDER BY `date` DESC
 
-# Promìnné specifické pro daný stát - NEFUNKÈNÍ
-
+# Promìnné specifické pro daný stát - tabulka countries
 SELECT
-	c.country,
-	c.population_density,
-	e.population,
-	e.GDP,
-	ROUND((e.GDP/e.population,2) AS 'GDP/population'
-FROM countries c
-LEFT JOIN economies e 
-ON c.country = e.country 
+	country,
+	population_density,
+	median_age_2018
+FROM countries c 
 WHERE 1=1
-	AND e.country IS NOT NULL 
-	AND e.population IS NOT NULL 
-	AND e.GDP IS NOT NULL
-
+	AND country IS NOT NULL 
+	AND median_age_2018 IS NOT NULL
+	
+# Promìnné specifické pro daný stát - tabulka economies
 SELECT 
 	country,
-	population,
+	#population,
 	GDP,
-	ROUND((GDP/population),2) AS 'GDP/population'
+	ROUND((GDP/population),2) AS 'GDP/population',
+	gini,
+	mortaliy_under5 
 FROM economies e 
 WHERE 1=1
 	AND country IS NOT NULL 
-	AND population IS NOT NULL 
-	AND GDP IS NOT NULL
+	#AND population IS NOT NULL 
+	AND GDP IS NOT NULL	
+	AND gini IS NOT NULL
+	AND mortaliy_under5 IS NOT NULL
+	
+# Promìnné specifické pro daný stát - tabulka religions + economies
+
+SELECT 
+	r.country,
+	#e.country,
+	#e.population,
+	#r.population,
+	r.religion,
+	ROUND(((r.population/e.population)*100),2) AS percentage_of_believers 
+FROM religions r
+RIGHT JOIN economies e 
+ON r.country = e.country
+AND r.`year` = e.`year` 
+WHERE 1=1
+	AND e.country IS NOT NULL
+	AND r.country IS NOT NULL
+	AND e.population IS NOT NULL 	
 
 # Poèasí
 SELECT	

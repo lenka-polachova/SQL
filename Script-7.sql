@@ -8,7 +8,7 @@ SELECT DISTINCT
 FROM covid19_basic cb
 ORDER BY `date` DESC
 
-# Èasové promìnné - roèní období daného dne - NEFUNKÈNÍ
+# Èasové promìnné - roèní období daného dne 
 SELECT DISTINCT
 	`date`,
 	CASE WHEN (MONTH(`date`)) IN ('1','2','12') THEN 0
@@ -18,7 +18,8 @@ SELECT DISTINCT
 	END AS season
 FROM covid19_basic cb 
 
-/*SELECT 
+/* NEFUNKÈNÍ DOTAZ
+SELECT 
 	country,
 	`date`,
 	CASE WHEN (((YEAR(`date`))%4)>0)
@@ -92,24 +93,47 @@ WHERE 1=1
 
 # Promìnné specifické pro daný stát - Podíly jednotlivých náboženství
 # Tabulka religions je vedená až do roku 2050?
+# Vychází víc než 100% vìøících - nesprávné hodnoty v tabulce
 SELECT 
 	r.country,
-	c.country,
-	c.population,
-	r.population,
+	#e.country,
+	#e.population,
+	#r.population,
 	r.religion,
-	ROUND(((r.population/c.population)*100),2) AS percentage_of_believers 
+	ROUND(((r.population/e.population)*100),2) AS percentage_of_believers 
 FROM religions r
-RIGHT JOIN countries c 
-ON r.country = c.country 
+RIGHT JOIN economies e 
+ON r.country = e.country
+AND r.`year` = e.`year` 
+WHERE 1=1
+	AND e.country IS NOT NULL
+	AND r.country IS NOT NULL
+	AND e.population IS NOT NULL 
+
+SELECT * FROM economies e 
 
 # Promìnné specifické pro daný stát - Rozdíl mezi oèekávanou dobou dožití v roce 2015 a 1965
-SELECT 
-	country,
-	life_expectancy 
-FROM life_expectancy le
-WHERE `year` = '2015'
-   OR `year` = '1965'
+WITH year_2015 AS(
+	SELECT 
+		country,
+		life_expectancy 
+	FROM life_expectancy le
+	WHERE `year` = '2015'
+),
+year_1965 AS (
+	SELECT 
+		country,
+		life_expectancy 
+	FROM life_expectancy le
+	WHERE `year` = '1965'
+)
+SELECT DISTINCT 
+	year_2015.country,
+	ROUND((year_2015.life_expectancy-year_1965.life_expectancy),2) AS life_expectancy_differrence
+FROM year_2015
+LEFT JOIN year_1965
+ON year_2015.country = year_1965.country 
+
 
 # Poèasí - prùmìrná denní teplota
 SELECT * FROM weather w 
@@ -117,7 +141,7 @@ SELECT * FROM weather w
 SELECT
 	city,
 	`date`,
-	AVG(temp)
+	AVG(temp) AS average_temperature
 FROM weather w
 WHERE 1=1
 	AND `time` != '00:00'
