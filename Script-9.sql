@@ -1,5 +1,7 @@
-# Èasové promìnné
-SELECT DISTINCT 
+#doèasné view - èasové promìnné 
+CREATE OR REPLACE VIEW tmp_v_lp_time AS
+SELECT DISTINCT
+	country,
 	`date`,
 	CASE WHEN ((WEEKDAY(`date`))<5)
 		THEN 0
@@ -11,41 +13,48 @@ SELECT DISTINCT
 		 ELSE 3
 	END AS season
 FROM covid19_basic cb
-ORDER BY `date` DESC
+WHERE country IS NOT NULL
+ORDER BY country, `date` DESC
 
-# Promìnné specifické pro daný stát - tabulka countries
+SELECT * FROM tmp_v_lp_time
+
+# doèasné view - countries
+CREATE OR REPLACE VIEW tmp_v_lp_countries AS 
 SELECT
-	country,
-	population_density,
-	median_age_2018
+	tvlpt.*,
+	#country,
+	c.population_density,
+	c.median_age_2018
 FROM countries c 
+RIGHT JOIN tmp_v_lp_time tvlpt
+ON c.country = tvlpt.country
 WHERE 1=1
-	AND country IS NOT NULL 
-	AND median_age_2018 IS NOT NULL
+	AND c.population_density IS NOT NULL
+	AND c.country IS NOT NULL 
+	AND c.median_age_2018 IS NOT NULL
 	
-# Promìnné specifické pro daný stát - tabulka economies
+SELECT * FROM tmp_v_lp_countries
+
+#doèasné view - economies 
+CREATE OR REPLACE VIEW tmp_v_lp_economies AS
 SELECT 
-	country,
-	#population,
-	GDP,
-	ROUND((GDP/population),2) AS 'GDP/population',
-	gini,
-	mortaliy_under5 
+	e.country,
+	e.`year`,
+	ROUND((e.GDP/e.population),2) AS 'GDP/population',
+	e.gini,
+	e.mortaliy_under5
 FROM economies e 
 WHERE 1=1
-	AND country IS NOT NULL 
-	#AND population IS NOT NULL 
-	AND GDP IS NOT NULL	
-	AND gini IS NOT NULL
-	AND mortaliy_under5 IS NOT NULL
-	
-# Promìnné specifické pro daný stát - tabulka religions + economies
+	AND e.country IS NOT NULL 
+ORDER BY country, `year` DESC
 
+	
+SELECT * FROM tmp_v_lp_economies
+
+# doèasné view - religions 
+CREATE OR REPLACE VIEW tmp_v_lp_religions AS
 SELECT 
 	r.country,
-	#e.country,
-	#e.population,
-	#r.population,
 	r.religion,
 	ROUND(((r.population/e.population)*100),2) AS percentage_of_believers 
 FROM religions r
@@ -57,7 +66,35 @@ WHERE 1=1
 	AND r.country IS NOT NULL
 	AND e.population IS NOT NULL 	
 	
-# Promìnné specifické pro daný stát - Rozdíl mezi oèekávanou dobou dožití v roce 2015 a 1965 - tabulka life_expectancy	
+SELECT * FROM tmp_v_lp_religions 
+
+# doèasné view - spojení countries, economies, religions
+CREATE OR REPLACE VIEW tmp_v_lp_almost_final AS
+WITH economies_and_religions AS(
+SELECT 
+	tvle.*,
+	tvlr.religion,
+	tvlr.percentage_of_believers
+FROM tmp_v_lp_economies tvle 
+RIGHT JOIN tmp_v_lp_religions tvlr 
+ON tvle.country = tvlr.country
+)
+SELECT 
+	tvlc.*,
+	ear.`GDP/population`,
+	ear.gini,
+	ear.mortaliy_under5,
+	ear.religion,
+	ear.percentage_of_believers
+FROM economies_and_religions ear
+LEFT JOIN tmp_v_lp_countries tvlc 
+ON ear.country = tvlc.country
+AND ear.`year` = YEAR(tvlc.`date`) 
+
+SELECT * FROM tmp_v_lp_almost_final
+
+# doèasné view - Rozdíl mezi oèekávanou dobou dožití v roce 2015 a 1965
+CREATE OR REPLACE VIEW tmp_v_lp_life_expectancy_differrence AS
 WITH year_2015 AS(
 	SELECT 
 		country,
@@ -72,14 +109,29 @@ year_1965 AS (
 	FROM life_expectancy le
 	WHERE `year` = '1965'
 )
-SELECT DISTINCT 
+SELECT #DISTINCT 
 	year_2015.country,
 	ROUND((year_2015.life_expectancy-year_1965.life_expectancy),2) AS life_expectancy_differrence
 FROM year_2015
 LEFT JOIN year_1965
 ON year_2015.country = year_1965.country 
 
-# Poèasí
+SELECT * FROM tmp_v_lp_life_expectancy_differrence
+
+# doèasné view - spojení almost final a life_expectancy_differrence
+CREATE OR REPLACE VIEW tmp_v_lp_almost_almost_final AS
+SELECT
+	tvlaf.*,
+	tvlled.life_expectancy_differrence
+FROM tmp_v_lp_almost_final tvlaf 
+RIGHT JOIN tmp_v_lp_life_expectancy_differrence tvlled 
+ON tvlaf.country = tvlled.country
+#WHERE tvlaf.country LIKE 'Poland'
+
+SELECT * FROM tmp_v_lp_almost_almost_final 
+
+# doèasné view - poèasí
+CREATE OR REPLACE VIEW tmp_v_lp_weather AS 
 SELECT	
 	city,
 	CASE WHEN w.city = 'Amsterdam' THEN 'Netherlands'
@@ -131,4 +183,20 @@ WHERE 1=1
 	AND SUBSTRING(rain,1,3) != '0.0' 
 GROUP BY city, `date` 
 
-#SELECT * FROM economies e  
+SELECT * FROM tmp_v_lp_weather
+
+/*-------------NETESTOVANÝ KÓD-------------*/
+# spojení almost_almost_final a weather
+#CREATE TABLE t_lenka_polachova_projekt_SQL_final
+SELECT 
+	tvlaaf.*,
+	tvlw.city,
+	tvlw.`date`,
+	tvlw.average_temperature,
+	tvlw.`MAX(wind)`,
+	tvlw.rainy_hours 
+FROM tmp_v_lp_weather tvlw
+LEFT JOIN tmp_v_lp_almost_almost_final tvlaaf 
+ON tvlaaf.country = tvlw.country
+AND DATE(tvlaaf.`date`) = DATE(tvlw.`date`)
+ORDER BY tvlaaf.country, tvlw.city, tvlw.`date`
